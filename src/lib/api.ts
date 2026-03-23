@@ -52,7 +52,7 @@ const CM_HEADERS={"x-rapidapi-host":"cardmarket-api-tcg.p.rapidapi.com","x-rapid
 
 interface CMResponse{data:CardMarketTCGCard[];meta?:{total:number;page:number}}
 
-export async function searchCardMarketCards(query:string,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon",limit=20):Promise<CardMarketTCGCard[]> { if(!CM_KEY){console.warn("[CardMarket] API key não configurada");return [];} const data=await safeFetch<CMResponse>(`${CM_BASE}/${game}/cards/search?name=${encodeURIComponent(query)}&limit=${limit}&sort=price_highest`,"CardMarket",{headers:CM_HEADERS}); return data.data??[]; }
+export async function searchCardMarketCards(query:string,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon",limit=20):Promise<CardMarketTCGCard[]> { if(!CM_KEY){console.warn("[CardMarket] API key não configurada");return [];} const data=await safeFetch<CMResponse>(`${CM_BASE}/${game}/cards?search=${encodeURIComponent(query)}&limit=${limit}&sort=price_highest`,"CardMarket",{headers:CM_HEADERS}); return data.data??[]; }
 
 export async function getCardMarketEpisodeCards(episodeId:number,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon",sort:"price_highest"|"price_lowest"|"name"="price_highest"):Promise<CardMarketTCGCard[]> { if(!CM_KEY) return []; const data=await safeFetch<CMResponse>(`${CM_BASE}/${game}/episodes/${episodeId}/cards?sort=${sort}`,"CardMarket",{headers:CM_HEADERS}); return data.data??[]; }
 
