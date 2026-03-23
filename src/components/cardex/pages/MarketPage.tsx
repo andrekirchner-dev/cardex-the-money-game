@@ -5,7 +5,7 @@ import { getPokemonPrice, getScryfallImage, getCardMarketPriceSummary, formatUSD
 type Category="All"|"Pokémon"|"Yu-Gi-Oh"|"MTG"|"Sports"|"One Piece";
 const categories:Category[]=["All","Pokémon","Yu-Gi-Oh","MTG","Sports","One Piece"];
 
-const HAS_CM_KEY=!!import.meta.env.VITE_CARDMARKET_RAPIDAPI_KEY;
+
 
 const staticCards={"Yu-Gi-Oh":[{id:"ygo1",name:"Blue-Eyes White Dragon",brand:"Yu-Gi-Oh",price:"$320",emoji:"🐉",bg:"linear-gradient(135deg,#3E446E,#59AC99)"},{id:"ygo2",name:"Dark Magician",brand:"Yu-Gi-Oh",price:"$180",emoji:"🧙",bg:"linear-gradient(135deg,#3E446E,#6B3FA0)"},{id:"ygo3",name:"Exodia the Forbidden One",brand:"Yu-Gi-Oh",price:"$450",emoji:"💀",bg:"linear-gradient(135deg,#2a1a4e,#3E446E)"}],Sports:[{id:"sp1",name:"LeBron Rookie PSA 10",brand:"Sports",price:"$4,200",emoji:"🏀",bg:"linear-gradient(135deg,#F56438,#FCAB20)"},{id:"sp2",name:"Michael Jordan RC BGS 9",brand:"Sports",price:"$6,800",emoji:"🏆",bg:"linear-gradient(135deg,#E7363C,#F56438)"}],"One Piece":[{id:"op1",name:"Luffy Leader Promo",brand:"One Piece",price:"$180",emoji:"🏴‍☠️",bg:"linear-gradient(135deg,#E7363C,#3E446E)"},{id:"op2",name:"Shanks Secret Rare",brand:"One Piece",price:"$420",emoji:"⚔️",bg:"linear-gradient(135deg,#3E446E,#E7363C)"}]};
 
