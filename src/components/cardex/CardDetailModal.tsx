@@ -45,17 +45,18 @@ const CardDetailModal = ({ card, onClose }: { card: UnifiedCard | null; onClose:
 
   return (
     <div
-      className="absolute inset-0 z-50 flex flex-col"
+      className="absolute inset-0 z-50 flex items-end"
       style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
       <div
-        className="flex-1 overflow-y-auto"
-        onClick={e => e.stopPropagation()}
+        className="w-full max-h-[90vh] overflow-y-auto rounded-t-2xl pb-24"
         style={{
+          background: "#1a1a2e",
           transform: visible ? "translateY(0)" : "translateY(100%)",
           transition: "transform 0.35s cubic-bezier(0.16,1,0.3,1)",
         }}
+        onClick={e => e.stopPropagation()}
       >
         {/* Close */}
         <div className="flex justify-end p-4">
