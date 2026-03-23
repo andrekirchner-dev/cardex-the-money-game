@@ -57,3 +57,18 @@ export async function searchCardMarketCards(query:string,game:"pokemon"|"magic"|
 export async function getCardMarketEpisodeCards(episodeId:number,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon",sort:"price_highest"|"price_lowest"|"name"="price_highest"):Promise<CardMarketTCGCard[]> { if(!CM_KEY) return []; const data=await safeFetch<CMResponse>(`${CM_BASE}/${game}/episodes/${episodeId}/cards?sort=${sort}`,"CardMarket",{headers:CM_HEADERS}); return data.data??[]; }
 
 export function getCardMarketPriceSummary(card:CardMarketTCGCard){const cm=card.prices?.cardmarket as any;const tcp=card.prices?.tcgplayer as any;const tcp2=card.prices?.tcg_player as any;const g=card.prices?.graded;return{eur_avg:cm?.lowest_near_mint??cm?.["30d_average"]??cm?.avg??cm?.trend??null,eur_low:cm?.low??null,eur_es:cm?.lowest_near_mint_ES??cm?.es??null,eur_de:cm?.lowest_near_mint_DE??cm?.de??null,eur_fr:cm?.lowest_near_mint_FR??cm?.fr??null,eur_foil:cm?.avg_foil??null,usd_market:tcp2?.market_price??tcp?.market??tcp?.avg??null,usd_low:tcp2?.low??tcp?.low??null,usd_foil:tcp?.market_foil??null,psa10:cm?.graded?.psa?.psa10??g?.psa_10??null,psa9:cm?.graded?.psa?.psa9??g?.psa_9??null,cgc10:cm?.graded?.cgc?.cgc10??g?.cgc_10??null};}
+
+// Yu-Gi-Oh
+export interface YuGiOhCard { id:number; name:string; desc:string; type:string; race?:string; attribute?:string; card_images:Array<{id:number;image_url:string;image_url_small:string}>; card_prices?:Array<{cardmarket_price:string;tcgplayer_price:string;ebay_price:string}>; card_sets?:Array<{set_name:string;set_code:string;set_rarity:string;set_price:string}>; }
+
+export async function searchYuGiOhCards(query:string,limit=20):Promise<YuGiOhCard[]> { const data=await safeFetch<{data:YuGiOhCard[]}>(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=${limit}&offset=0`,"YGOPRODeck"); return data.data??[]; }
+
+// One Piece & Lorcana (via CardMarket)
+export interface OnePieceCard extends CardMarketTCGCard {}
+export interface LorcanaCard extends CardMarketTCGCard {}
+
+export async function searchOnePieceCards(query:string,limit=20):Promise<OnePieceCard[]> { return searchCardMarketCards(query,"one-piece" as any,limit); }
+export async function searchLorcanaCards(query:string,limit=20):Promise<LorcanaCard[]> { return searchCardMarketCards(query,"lorcana",limit); }
+
+// Price history mock
+export function generatePriceHistory(currentPrice:number):Array<{month:string;price:number}> { const months=["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"]; let price=currentPrice*(0.7+Math.random()*0.3); return months.map((month,i)=>{ const target=i===11?currentPrice:currentPrice*(0.75+Math.random()*0.5); price=price*0.6+target*0.4+(Math.random()-0.5)*currentPrice*0.05; return {month,price:Math.max(0.01,parseFloat(price.toFixed(2)))}; }); }
