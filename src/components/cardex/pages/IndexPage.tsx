@@ -1,9 +1,21 @@
 import { useState, useMemo } from "react";
-import { usePokemonCards, useScryfallCards, useMercadoLivrePrice } from "@/hooks/useCardSearch";
-import { getPokemonPrice, getScryfallImage, formatUSD, formatEUR, formatBRL, type PokemonCard, type ScryfallCard, type MercadoLivreItem } from "@/lib/api";
+import { usePokemonCards, useScryfallCards, useMercadoLivrePrice, useYuGiOhCards, useOnePieceCards, useLorcanaCards } from "@/hooks/useCardSearch";
+import { getPokemonPrice, getScryfallImage, getCardMarketPriceSummary, formatUSD, formatEUR, formatBRL, generatePriceHistory, type PokemonCard, type ScryfallCard, type MercadoLivreItem, type YuGiOhCard, type CardMarketTCGCard } from "@/lib/api";
+import CardDetailModal, { type UnifiedCard } from "@/components/cardex/CardDetailModal";
 
-type Category = "Pokémon" | "MTG" | "Yu-Gi-Oh" | "Sports" | "One Piece";
-const categories: Category[] = ["Pokémon", "MTG", "Yu-Gi-Oh", "Sports", "One Piece"];
+type Category = "Pokémon" | "MTG" | "One Piece" | "Lorcana" | "Yu-Gi-Oh" | "Sports";
+const categories: Category[] = ["Pokémon", "MTG", "One Piece", "Lorcana", "Yu-Gi-Oh", "Sports"];
+
+const SPORTS_CARDS = [
+  { id: "s1", name: "Mike Trout 2009 Bowman Chrome RC", set: "Bowman Chrome", image: "https://images.pokemontcg.io/base1/4_hires.png", priceUsd: 9800, priceEur: 9100, rarity: "PSA 10" },
+  { id: "s2", name: "LeBron James 2003 Topps Chrome RC", set: "Topps Chrome", image: "https://images.pokemontcg.io/base1/5_hires.png", priceUsd: 7200, priceEur: 6700, rarity: "BGS 9.5" },
+  { id: "s3", name: "Patrick Mahomes 2017 Panini Prizm RC", set: "Panini Prizm", image: "https://images.pokemontcg.io/base1/6_hires.png", priceUsd: 3400, priceEur: 3100, rarity: "PSA 10" },
+  { id: "s4", name: "Michael Jordan 1986 Fleer RC", set: "Fleer", image: "https://images.pokemontcg.io/base1/7_hires.png", priceUsd: 18500, priceEur: 17200, rarity: "PSA 9" },
+  { id: "s5", name: "Tom Brady 2000 Playoff Contenders RC", set: "Playoff Contenders", image: "https://images.pokemontcg.io/base1/8_hires.png", priceUsd: 4100, priceEur: 3800, rarity: "PSA 10" },
+  { id: "s6", name: "Shohei Ohtani 2018 Topps Chrome RC", set: "Topps Chrome", image: "https://images.pokemontcg.io/base1/9_hires.png", priceUsd: 1200, priceEur: 1100, rarity: "PSA 10" },
+  { id: "s7", name: "Luka Doncic 2018 Prizm Silver RC", set: "Panini Prizm", image: "https://images.pokemontcg.io/base1/10_hires.png", priceUsd: 2800, priceEur: 2600, rarity: "PSA 10" },
+  { id: "s8", name: "Connor McDavid 2015 Upper Deck Young Guns", set: "Upper Deck", image: "https://images.pokemontcg.io/base1/11_hires.png", priceUsd: 950, priceEur: 880, rarity: "PSA 10" },
+];
 
 const tileBase: React.CSSProperties = { background: "#1C1C28", border: "1px solid rgba(255,255,255,0.07)", transition: "transform 0.15s, box-shadow 0.15s" };
 const hover = {
@@ -13,10 +25,38 @@ const hover = {
 
 function CardSkeleton() { return (<div className="rounded-[14px] overflow-hidden" style={{ background: "#1C1C28", border: "1px solid rgba(255,255,255,0.07)" }}><div style={{ height: 90, background: "linear-gradient(90deg,#1C1C28 25%,#252535 50%,#1C1C28 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite" }} /><div className="p-3"><div style={{ height: 10, width: "80%", borderRadius: 4, background: "rgba(255,255,255,0.06)", marginBottom: 6 }} /><div style={{ height: 8, width: "50%", borderRadius: 4, background: "rgba(255,255,255,0.04)", marginBottom: 8 }} /><div style={{ height: 14, width: "40%", borderRadius: 4, background: "rgba(255,255,255,0.06)" }} /></div></div>); }
 
-function PokemonTile({ card }: { card: PokemonCard }) {
+// Normalizers
+function pokemonToUnified(card: PokemonCard): UnifiedCard {
+  const { usd, eur } = getPokemonPrice(card);
+  return { id: card.id, name: card.name, imageSmall: card.images?.small ?? "", imageLarge: card.images?.large ?? card.images?.small ?? "", game: "pokemon", set: card.set?.name ?? "", rarity: card.rarity, prices: { usdMarket: usd ?? undefined, eurAvg: eur ?? undefined }, priceHistory: generatePriceHistory(usd ?? eur ?? 5) };
+}
+function scryfallToUnified(card: ScryfallCard): UnifiedCard {
+  const img = getScryfallImage(card) ?? "";
+  const usd = card.prices.usd ? parseFloat(card.prices.usd) : undefined;
+  const eur = card.prices.eur ? parseFloat(card.prices.eur) : undefined;
+  return { id: card.id, name: card.name, imageSmall: img, imageLarge: card.image_uris?.large ?? img, game: "mtg", set: card.set_name, rarity: card.rarity, prices: { usdMarket: usd, eurAvg: eur }, priceHistory: generatePriceHistory(usd ?? eur ?? 3) };
+}
+function yugiohToUnified(card: YuGiOhCard): UnifiedCard {
+  const img = card.card_images?.[0]?.image_url_small ?? "";
+  const imgL = card.card_images?.[0]?.image_url ?? img;
+  const usd = card.card_prices?.[0]?.tcgplayer_price ? parseFloat(card.card_prices[0].tcgplayer_price) : undefined;
+  const eur = card.card_prices?.[0]?.cardmarket_price ? parseFloat(card.card_prices[0].cardmarket_price) : undefined;
+  const sets = card.card_sets?.map(s => s.set_name) ?? [];
+  return { id: String(card.id), name: card.name, imageSmall: img, imageLarge: imgL, game: "yugioh", set: sets[0] ?? "Yu-Gi-Oh!", rarity: card.card_sets?.[0]?.set_rarity, description: card.desc, reprints: sets.slice(1, 6), prices: { usdMarket: usd, eurAvg: eur }, priceHistory: generatePriceHistory(usd ?? eur ?? 2) };
+}
+function cmToUnified(card: CardMarketTCGCard, game: "onepiece" | "lorcana"): UnifiedCard {
+  const p = getCardMarketPriceSummary(card);
+  return { id: String(card.id), name: card.name, imageSmall: card.image ?? "", imageLarge: card.image ?? "", game, set: card.episode?.name ?? "", number: card.card_number ?? undefined, rarity: card.rarity ?? undefined, artist: card.artist?.name, prices: { eurAvg: p.eur_avg ?? undefined, usdMarket: p.usd_market ?? undefined, psa10: p.psa10 ?? undefined, psa9: p.psa9 ?? undefined, cgc10: p.cgc10 ?? undefined }, priceHistory: generatePriceHistory(p.eur_avg ?? p.usd_market ?? 3) };
+}
+function sportsToUnified(card: typeof SPORTS_CARDS[0]): UnifiedCard {
+  return { id: card.id, name: card.name, imageSmall: card.image, imageLarge: card.image, game: "sports", set: card.set, rarity: card.rarity, prices: { usdMarket: card.priceUsd, eurAvg: card.priceEur }, priceHistory: generatePriceHistory(card.priceUsd) };
+}
+
+// Tiles
+function PokemonTile({ card, onClick }: { card: PokemonCard; onClick: () => void }) {
   const { usd, eur } = getPokemonPrice(card);
   return (
-    <div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover}>
+    <div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover} onClick={onClick}>
       <div className="relative flex items-center justify-center overflow-hidden" style={{ height: 90, background: "rgba(255,255,255,0.03)" }}>
         {card.images?.small ? <img src={card.images.small} alt={card.name} loading="lazy" style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 34 }}>🃏</span>}
         {card.rarity && <div className="absolute top-1 right-1 rounded px-1" style={{ fontFamily: "var(--font-tech)", fontSize: 7, background: "rgba(0,0,0,0.65)", color: "rgba(255,255,255,0.45)" }}>{card.rarity.toUpperCase().slice(0, 5)}</div>}
@@ -33,11 +73,11 @@ function PokemonTile({ card }: { card: PokemonCard }) {
   );
 }
 
-function ScryfallTile({ card }: { card: ScryfallCard }) {
+function ScryfallTile({ card, onClick }: { card: ScryfallCard; onClick: () => void }) {
   const usd = card.prices.usd ? parseFloat(card.prices.usd) : null;
   const eur = card.prices.eur ? parseFloat(card.prices.eur) : null;
   return (
-    <div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover}>
+    <div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover} onClick={onClick}>
       <div className="relative flex items-center justify-center overflow-hidden" style={{ height: 90, background: "rgba(255,255,255,0.03)" }}>
         {getScryfallImage(card) ? <img src={getScryfallImage(card)} alt={card.name} loading="lazy" style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 34 }}>🃏</span>}
       </div>
@@ -47,6 +87,66 @@ function ScryfallTile({ card }: { card: ScryfallCard }) {
         <div className="flex flex-col gap-[2px]">
           {usd != null && <div className="flex items-center gap-[3px]"><span style={{ fontSize: 9 }}>🇺🇸</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#fff" }}>{formatUSD(usd)}</span></div>}
           {eur != null && <div className="flex items-center gap-[3px]"><span style={{ fontSize: 9 }}>🇪🇺</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#fff" }}>{formatEUR(eur)}</span></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function YuGiOhTile({ card, onClick }: { card: YuGiOhCard; onClick: () => void }) {
+  const img = card.card_images?.[0]?.image_url_small;
+  const usd = card.card_prices?.[0]?.tcgplayer_price ? parseFloat(card.card_prices[0].tcgplayer_price) : null;
+  const eur = card.card_prices?.[0]?.cardmarket_price ? parseFloat(card.card_prices[0].cardmarket_price) : null;
+  return (
+    <div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover} onClick={onClick}>
+      <div className="relative flex items-center justify-center overflow-hidden" style={{ height: 90, background: "rgba(255,255,255,0.03)" }}>
+        {img ? <img src={img} alt={card.name} loading="lazy" style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 34 }}>🃏</span>}
+      </div>
+      <div className="p-3">
+        <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1.3, marginBottom: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{card.name}</div>
+        <div style={{ fontFamily: "var(--font-tech)", fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{card.type}</div>
+        <div className="flex flex-col gap-[2px]">
+          {usd != null && usd > 0 && <div className="flex items-center gap-[3px]"><span style={{ fontSize: 9 }}>🇺🇸</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#fff" }}>{formatUSD(usd)}</span></div>}
+          {eur != null && eur > 0 && <div className="flex items-center gap-[3px]"><span style={{ fontSize: 9 }}>🇪🇺</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#fff" }}>{formatEUR(eur)}</span></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CardMarketGameTile({ card, game, onClick }: { card: CardMarketTCGCard; game: "onepiece" | "lorcana"; onClick: () => void }) {
+  const p = getCardMarketPriceSummary(card);
+  return (
+    <div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover} onClick={onClick}>
+      <div className="relative flex items-center justify-center overflow-hidden" style={{ height: 90, background: "rgba(255,255,255,0.03)" }}>
+        {card.image ? <img src={card.image} alt={card.name} loading="lazy" style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 34 }}>🃏</span>}
+        {card.rarity && <div className="absolute top-1 right-1 rounded px-1" style={{ fontFamily: "var(--font-tech)", fontSize: 7, background: "rgba(0,0,0,0.65)", color: "rgba(255,255,255,0.45)" }}>{card.rarity.toUpperCase().slice(0, 5)}</div>}
+      </div>
+      <div className="p-3">
+        <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1.3, marginBottom: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{card.name}</div>
+        <div style={{ fontFamily: "var(--font-tech)", fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{card.episode?.name ?? (game === "onepiece" ? "One Piece" : "Lorcana")}</div>
+        <div className="flex flex-col gap-[2px]">
+          {p.usd_market != null && <div className="flex items-center gap-[3px]"><span style={{ fontSize: 9 }}>🇺🇸</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#fff" }}>{formatUSD(p.usd_market)}</span></div>}
+          {p.eur_avg != null && <div className="flex items-center gap-[3px]"><span style={{ fontSize: 9 }}>🇪🇺</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#fff" }}>{formatEUR(p.eur_avg)}</span></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SportsTile({ card, onClick }: { card: typeof SPORTS_CARDS[0]; onClick: () => void }) {
+  return (
+    <div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover} onClick={onClick}>
+      <div className="relative flex items-center justify-center overflow-hidden" style={{ height: 90, background: "rgba(255,255,255,0.03)" }}>
+        <img src={card.image} alt={card.name} loading="lazy" style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+        <div className="absolute top-1 right-1 rounded px-1" style={{ fontFamily: "var(--font-tech)", fontSize: 7, background: "rgba(0,0,0,0.65)", color: "rgba(255,255,255,0.45)" }}>{card.rarity}</div>
+      </div>
+      <div className="p-3">
+        <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1.3, marginBottom: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{card.name}</div>
+        <div style={{ fontFamily: "var(--font-tech)", fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{card.set}</div>
+        <div className="flex flex-col gap-[2px]">
+          <div className="flex items-center gap-[3px]"><span style={{ fontSize: 9 }}>🇺🇸</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#fff" }}>{formatUSD(card.priceUsd)}</span></div>
+          <div className="flex items-center gap-[3px]"><span style={{ fontSize: 9 }}>🇪🇺</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#fff" }}>{formatEUR(card.priceEur)}</span></div>
         </div>
       </div>
     </div>
@@ -100,30 +200,69 @@ function MLSection({ query }: { query: string }) {
 const IndexPage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const [activeCat, setActiveCat] = useState<Category>("Pokémon");
   const [searchInput, setSearchInput] = useState("");
+  const [selectedCard, setSelectedCard] = useState<UnifiedCard | null>(null);
+
   const isPokemon = activeCat === "Pokémon";
   const isMTG = activeCat === "MTG";
+  const isYuGiOh = activeCat === "Yu-Gi-Oh";
+  const isOnePiece = activeCat === "One Piece";
+  const isLorcana = activeCat === "Lorcana";
+  const isSports = activeCat === "Sports";
   const activeQ = searchInput.trim().length >= 2 ? searchInput.trim() : "";
+
   const pokemonQ = usePokemonCards(isPokemon ? activeQ : "");
   const scryfallQ = useScryfallCards(isMTG ? activeQ : "");
-  const isLoading = (isPokemon && pokemonQ.isLoading) || (isMTG && scryfallQ.isLoading);
+  const yugiohQ = useYuGiOhCards(isYuGiOh ? activeQ : "");
+  const onepieceQ = useOnePieceCards(isOnePiece ? activeQ : "");
+  const lorcanaQ = useLorcanaCards(isLorcana ? activeQ : "");
+
+  const isLoading = (isPokemon && pokemonQ.isLoading) || (isMTG && scryfallQ.isLoading) || (isYuGiOh && yugiohQ.isLoading) || (isOnePiece && onepieceQ.isLoading) || (isLorcana && lorcanaQ.isLoading);
   const mlQuery = activeQ && isPokemon ? `${activeQ} pokemon` : "";
 
   const gridContent = useMemo(() => {
+    // Sports always shows
+    if (isSports) {
+      return SPORTS_CARDS.map(c => <SportsTile key={c.id} card={c} onClick={() => setSelectedCard(sportsToUnified(c))} />);
+    }
+
     if (!activeQ) return null;
+
+    const skeleton = Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />);
+    const noResults = [<div key="e" className="col-span-2 text-center py-8"><div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div><div style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "rgba(255,255,255,0.4)" }}>SEM RESULTADOS</div></div>];
+    const errorEl = [<div key="e" className="col-span-2 text-center py-8"><div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div><div style={{ fontFamily: "var(--font-tech)", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Erro ao buscar</div></div>];
+
     if (isPokemon) {
-      if (pokemonQ.isLoading) return Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />);
-      if (pokemonQ.isError) return [<div key="e" className="col-span-2 text-center py-8"><div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div><div style={{ fontFamily: "var(--font-tech)", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Erro ao buscar</div></div>];
-      if (!pokemonQ.data?.length) return [<div key="e" className="col-span-2 text-center py-8"><div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div><div style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "rgba(255,255,255,0.4)" }}>SEM RESULTADOS</div></div>];
-      return pokemonQ.data.map(c => <PokemonTile key={c.id} card={c} />);
+      if (pokemonQ.isLoading) return skeleton;
+      if (pokemonQ.isError) return errorEl;
+      if (!pokemonQ.data?.length) return noResults;
+      return pokemonQ.data.map(c => <PokemonTile key={c.id} card={c} onClick={() => setSelectedCard(pokemonToUnified(c))} />);
     }
     if (isMTG) {
-      if (scryfallQ.isLoading) return Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />);
-      if (scryfallQ.isError) return [<div key="e" className="col-span-2 text-center py-8"><div style={{ fontFamily: "var(--font-tech)", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>⚠️ Erro</div></div>];
-      if (!scryfallQ.data?.length) return [<div key="e" className="col-span-2 text-center py-8"><div style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "rgba(255,255,255,0.4)" }}>SEM RESULTADOS</div></div>];
-      return scryfallQ.data.map(c => <ScryfallTile key={c.id} card={c} />);
+      if (scryfallQ.isLoading) return skeleton;
+      if (scryfallQ.isError) return errorEl;
+      if (!scryfallQ.data?.length) return noResults;
+      return scryfallQ.data.map(c => <ScryfallTile key={c.id} card={c} onClick={() => setSelectedCard(scryfallToUnified(c))} />);
     }
-    return [<div key="e" className="col-span-2 text-center py-8" style={{ fontFamily: "var(--font-tech)", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Busca para {activeCat} em breve</div>];
-  }, [activeQ, activeCat, isPokemon, isMTG, pokemonQ, scryfallQ]);
+    if (isYuGiOh) {
+      if (yugiohQ.isLoading) return skeleton;
+      if (yugiohQ.isError) return errorEl;
+      if (!yugiohQ.data?.length) return noResults;
+      return yugiohQ.data.map(c => <YuGiOhTile key={c.id} card={c} onClick={() => setSelectedCard(yugiohToUnified(c))} />);
+    }
+    if (isOnePiece) {
+      if (onepieceQ.isLoading) return skeleton;
+      if (onepieceQ.isError) return errorEl;
+      if (!onepieceQ.data?.length) return noResults;
+      return onepieceQ.data.map(c => <CardMarketGameTile key={c.id} card={c} game="onepiece" onClick={() => setSelectedCard(cmToUnified(c, "onepiece"))} />);
+    }
+    if (isLorcana) {
+      if (lorcanaQ.isLoading) return skeleton;
+      if (lorcanaQ.isError) return errorEl;
+      if (!lorcanaQ.data?.length) return noResults;
+      return lorcanaQ.data.map(c => <CardMarketGameTile key={c.id} card={c} game="lorcana" onClick={() => setSelectedCard(cmToUnified(c, "lorcana"))} />);
+    }
+    return null;
+  }, [activeQ, activeCat, isPokemon, isMTG, isYuGiOh, isOnePiece, isLorcana, isSports, pokemonQ, scryfallQ, yugiohQ, onepieceQ, lorcanaQ]);
 
   return (
     <div>
@@ -150,7 +289,7 @@ const IndexPage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         ))}
       </div>
 
-      {!activeQ ? (
+      {!activeQ && !isSports ? (
         <div className="text-center py-12">
           <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "rgba(255,255,255,0.2)", letterSpacing: "0.06em" }}>SEARCH ANY CARD</div>
@@ -162,6 +301,8 @@ const IndexPage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
           {isPokemon && <MLSection query={mlQuery} />}
         </>
       )}
+
+      <CardDetailModal card={selectedCard} onClose={() => setSelectedCard(null)} />
       <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );

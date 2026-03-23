@@ -1,10 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { searchPokemonCards, getFeaturedPokemonCards, searchScryfallCards, searchTCGDexCards, searchMercadoLivre, searchPokeTrace, searchCardMarketCards, getCardMarketEpisodeCards, calcMLStats, type PokemonCard, type ScryfallCard, type TCGDexCard, type CardMarketTCGCard } from "@/lib/api";
+import { searchPokemonCards, getFeaturedPokemonCards, searchScryfallCards, searchTCGDexCards, searchMercadoLivre, searchPokeTrace, searchCardMarketCards, getCardMarketEpisodeCards, calcMLStats, searchYuGiOhCards, searchOnePieceCards, searchLorcanaCards, type PokemonCard, type ScryfallCard, type TCGDexCard, type CardMarketTCGCard, type YuGiOhCard, type OnePieceCard, type LorcanaCard } from "@/lib/api";
 import { useDebounce } from "./useDebounce";
 
 const STALE=5*60*1000; const GC=30*60*1000;
-
-
 
 export function usePokemonCards(query:string){const q=useDebounce(query.trim(),400);return useQuery<PokemonCard[]>({queryKey:["pokemon","search",q],queryFn:()=>searchPokemonCards(q),enabled:q.length>=2,staleTime:STALE,gcTime:GC,retry:2});}
 
@@ -21,6 +19,12 @@ export function usePokeTrace(query:string){const q=useDebounce(query.trim(),500)
 export function useCardMarketSearch(query:string,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon"){const q=useDebounce(query.trim(),400);return useQuery<CardMarketTCGCard[]>({queryKey:["cardmarket",game,"search",q],queryFn:()=>searchCardMarketCards(q,game),enabled:q.length>=2,staleTime:STALE,gcTime:GC,retry:1});}
 
 export function useCardMarketEpisode(episodeId:number|null,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon"){return useQuery<CardMarketTCGCard[]>({queryKey:["cardmarket",game,"episode",episodeId],queryFn:()=>getCardMarketEpisodeCards(episodeId!,game),enabled:episodeId!=null,staleTime:15*60*1000,gcTime:GC,retry:1});}
+
+export function useYuGiOhCards(query:string){const q=useDebounce(query.trim(),400);return useQuery<YuGiOhCard[]>({queryKey:["yugioh","search",q],queryFn:()=>searchYuGiOhCards(q),enabled:q.length>=2,staleTime:STALE,gcTime:GC,retry:2});}
+
+export function useOnePieceCards(query:string){const q=useDebounce(query.trim(),400);return useQuery<OnePieceCard[]>({queryKey:["onepiece","search",q],queryFn:()=>searchOnePieceCards(q),enabled:q.length>=2,staleTime:STALE,gcTime:GC,retry:1});}
+
+export function useLorcanaCards(query:string){const q=useDebounce(query.trim(),400);return useQuery<LorcanaCard[]>({queryKey:["lorcana","search",q],queryFn:()=>searchLorcanaCards(q),enabled:q.length>=2,staleTime:STALE,gcTime:GC,retry:1});}
 
 export type MarketCategory="All"|"Pokémon"|"Yu-Gi-Oh"|"MTG"|"Sports"|"One Piece";
 
