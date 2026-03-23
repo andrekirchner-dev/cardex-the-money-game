@@ -1,100 +1,48 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { usePokemonCards, useScryfallCards, useMercadoLivrePrice, useCardMarketSearch } from "@/hooks/useCardSearch";
+import { getPokemonPrice, getScryfallImage, getCardMarketPriceSummary, formatUSD, formatEUR, formatBRL, type PokemonCard, type ScryfallCard, type CardMarketTCGCard, type MercadoLivreItem } from "@/lib/api";
 
-const categories = ["All", "Pokémon", "Yu-Gi-Oh", "MTG", "Sports", "One Piece"];
+type Category="All"|"Pokémon"|"Yu-Gi-Oh"|"MTG"|"Sports"|"One Piece";
+const categories:Category[]=["All","Pokémon","Yu-Gi-Oh","MTG","Sports","One Piece"];
 
-const marketCards = [
-  { emoji: "🔥", name: "Charizard Base Set", brand: "Pokémon TCG", price: "$350", bg: "linear-gradient(135deg, #E7363C, #F56438)" },
-  { emoji: "⚡", name: "Pikachu V Full Art", brand: "Pokémon TCG", price: "$85", bg: "linear-gradient(135deg, #FCAB20, #F56438)" },
-  { emoji: "🐉", name: "Blue-Eyes Ultimate", brand: "Yu-Gi-Oh", price: "$220", bg: "linear-gradient(135deg, #3E446E, #59AC99)" },
-  { emoji: "🗡️", name: "Black Lotus Alpha", brand: "MTG", price: "$9,800", bg: "linear-gradient(135deg, #1a1a2e, #3E446E)" },
-  { emoji: "🏀", name: "LeBron Rookie PSA 10", brand: "Sports", price: "$4,200", bg: "linear-gradient(135deg, #F56438, #FCAB20)" },
-  { emoji: "🏴‍☠️", name: "Luffy Leader Promo", brand: "One Piece", price: "$180", bg: "linear-gradient(135deg, #E7363C, #3E446E)" },
-];
+const HAS_CM_KEY=!!import.meta.env.VITE_CARDMARKET_RAPIDAPI_KEY;
 
-const MarketPage = () => {
-  const [activeCat, setActiveCat] = useState("All");
+const staticCards={"Yu-Gi-Oh":[{id:"ygo1",name:"Blue-Eyes White Dragon",brand:"Yu-Gi-Oh",price:"$320",emoji:"🐉",bg:"linear-gradient(135deg,#3E446E,#59AC99)"},{id:"ygo2",name:"Dark Magician",brand:"Yu-Gi-Oh",price:"$180",emoji:"🧙",bg:"linear-gradient(135deg,#3E446E,#6B3FA0)"},{id:"ygo3",name:"Exodia the Forbidden One",brand:"Yu-Gi-Oh",price:"$450",emoji:"💀",bg:"linear-gradient(135deg,#2a1a4e,#3E446E)"}],Sports:[{id:"sp1",name:"LeBron Rookie PSA 10",brand:"Sports",price:"$4,200",emoji:"🏀",bg:"linear-gradient(135deg,#F56438,#FCAB20)"},{id:"sp2",name:"Michael Jordan RC BGS 9",brand:"Sports",price:"$6,800",emoji:"🏆",bg:"linear-gradient(135deg,#E7363C,#F56438)"}],"One Piece":[{id:"op1",name:"Luffy Leader Promo",brand:"One Piece",price:"$180",emoji:"🏴‍☠️",bg:"linear-gradient(135deg,#E7363C,#3E446E)"},{id:"op2",name:"Shanks Secret Rare",brand:"One Piece",price:"$420",emoji:"⚔️",bg:"linear-gradient(135deg,#3E446E,#E7363C)"}]};
 
-  return (
-    <div>
-      <div style={{ fontFamily: "var(--font-tech)", fontSize: 10, letterSpacing: "0.2em", color: "#F56438", textTransform: "uppercase", marginBottom: 6 }}>
-        Browse
-      </div>
-      <h1 style={{ fontFamily: "var(--font-display)", fontSize: 42, letterSpacing: "0.02em", color: "#fff", lineHeight: 0.95, marginBottom: 14 }}>
-        MARKETPLACE
-      </h1>
+function Flag({flag,label,value}:{flag:string;label:string;value:string|null}){if(!value)return null;return(<div className="flex items-center gap-[3px]"><span style={{fontSize:9}}>{flag}</span><span style={{fontFamily:"var(--font-tech)",fontSize:8,color:"rgba(255,255,255,0.35)",letterSpacing:"0.04em"}}>{label}</span><span style={{fontFamily:"var(--font-mono)",fontSize:10,fontWeight:700,color:"#fff"}}>{value}</span></div>);}
 
-      {/* Search */}
-      <div className="relative mb-[14px]">
-        <svg className="absolute left-[13px] top-1/2 -translate-y-1/2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          type="text"
-          placeholder="Search cards..."
-          className="w-full rounded-[10px] outline-none"
-          style={{
-            padding: "11px 14px 11px 40px",
-            background: "#1C1C28",
-            border: "1px solid rgba(255,255,255,0.07)",
-            fontFamily: "var(--font-tech)", fontSize: 12, color: "#fff", letterSpacing: "0.05em",
-          }}
-        />
-      </div>
+function PriceStack({usd,eur,eur_es,eur_de,psa10}:{usd?:number|null;eur?:number|null;eur_es?:number|null;eur_de?:number|null;psa10?:number|null}){const hasAny=usd!=null||eur!=null||eur_es!=null;if(!hasAny)return<span style={{fontFamily:"var(--font-display)",fontSize:14,color:"rgba(255,255,255,0.2)"}}>N/A</span>;return(<div className="flex flex-col gap-[2px]">{usd!=null&&<Flag flag="🇺🇸" label="USD" value={formatUSD(usd)}/>}{eur!=null&&<Flag flag="🇪🇺" label="EUR" value={formatEUR(eur)}/>}{eur_es!=null&&eur_es!==eur&&<Flag flag="🇪🇸" label="ES" value={formatEUR(eur_es)}/>}{eur_de!=null&&eur_de!==eur&&<Flag flag="🇩🇪" label="DE" value={formatEUR(eur_de)}/>}{psa10!=null&&<Flag flag="🏆" label="PSA10" value={formatUSD(psa10)}/>}</div>);}
 
-      {/* Pills */}
-      <div className="flex gap-[6px] overflow-x-auto mb-4 pb-[2px]" style={{ scrollbarWidth: "none" }}>
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCat(cat)}
-            className="flex-shrink-0 cursor-pointer"
-            style={{
-              padding: "5px 14px", borderRadius: 6,
-              fontFamily: "var(--font-tech)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase",
-              background: activeCat === cat ? "#FCAB20" : "rgba(255,255,255,0.04)",
-              color: activeCat === cat ? "#000" : "rgba(255,255,255,0.4)",
-              border: `1px solid ${activeCat === cat ? "#FCAB20" : "rgba(255,255,255,0.07)"}`,
-              transition: "all 0.15s",
-            }}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
+function CardSkeleton(){return(<div className="rounded-[14px] overflow-hidden" style={{background:"#1C1C28",border:"1px solid rgba(255,255,255,0.07)"}}><div style={{height:90,background:"linear-gradient(90deg,#1C1C28 25%,#252535 50%,#1C1C28 75%)",backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite"}}/><div className="p-3"><div style={{height:10,width:"80%",borderRadius:4,background:"rgba(255,255,255,0.06)",marginBottom:6}}/><div style={{height:8,width:"50%",borderRadius:4,background:"rgba(255,255,255,0.04)",marginBottom:8}}/><div style={{height:28,width:"65%",borderRadius:4,background:"rgba(255,255,255,0.06)"}}/></div></div>);}
 
-      {/* Card Grid */}
-      <div className="grid grid-cols-2 gap-[10px] mb-[14px]">
-        {marketCards.map((card, i) => (
-          <div
-            key={i}
-            className="rounded-[14px] p-3 cursor-pointer text-left"
-            style={{
-              background: "#1C1C28",
-              border: "1px solid rgba(255,255,255,0.07)",
-              transition: "all 0.2s",
-            }}
-          >
-            <div
-              className="rounded-[10px] mb-[10px] flex items-center justify-center relative overflow-hidden"
-              style={{ height: 80, fontSize: 36 }}
-            >
-              <div className="absolute inset-0 opacity-[0.15]" style={{ background: card.bg }} />
-              <span className="relative z-10">{card.emoji}</span>
-            </div>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1.3, marginBottom: 3 }}>
-              {card.name}
-            </div>
-            <div style={{ fontFamily: "var(--font-tech)", fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 7 }}>
-              {card.brand}
-            </div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "#fff", letterSpacing: "0.02em" }}>
-              {card.price}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+const hover={onMouseEnter:(e:React.MouseEvent)=>{(e.currentTarget as HTMLElement).style.transform="translateY(-2px)";(e.currentTarget as HTMLElement).style.boxShadow="0 8px 24px rgba(0,0,0,0.4)";},onMouseLeave:(e:React.MouseEvent)=>{(e.currentTarget as HTMLElement).style.transform="";(e.currentTarget as HTMLElement).style.boxShadow="";}};
+
+const tileBase:React.CSSProperties={background:"#1C1C28",border:"1px solid rgba(255,255,255,0.07)",transition:"transform 0.15s, box-shadow 0.15s"};
+
+function CardImg({src,alt}:{src?:string;alt:string}){return(<div className="relative flex items-center justify-center overflow-hidden" style={{height:90,background:"rgba(255,255,255,0.03)"}}>{src?<img src={src} alt={alt} loading="lazy" decoding="async" style={{maxHeight:"100%",maxWidth:"100%",objectFit:"contain"}}/>:<span style={{fontSize:34}}>🃏</span>}</div>);}
+
+function RarityBadge({rarity}:{rarity?:string}){if(!rarity)return null;return<div className="absolute top-1 right-1 rounded px-1" style={{fontFamily:"var(--font-tech)",fontSize:7,background:"rgba(0,0,0,0.65)",color:"rgba(255,255,255,0.45)"}}>{rarity.toUpperCase().slice(0,5)}</div>;}
+
+function CardName({name}:{name:string}){return<div style={{fontFamily:"var(--font-mono)",fontSize:11,fontWeight:700,color:"#fff",lineHeight:1.3,marginBottom:2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{name}</div>;}
+
+function CardSub({text}:{text:string}){return<div style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.3)",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{text}</div>;}
+
+function PokemonTile({card}:{card:PokemonCard}){const{usd,eur}=getPokemonPrice(card);return(<div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover}><div className="relative"><CardImg src={card.images?.small} alt={card.name}/><RarityBadge rarity={card.rarity}/></div><div className="p-3"><CardName name={card.name}/><CardSub text={card.set?.name??"Pokémon TCG"}/><PriceStack usd={usd} eur={eur}/></div></div>);}
+
+function ScryfallTile({card}:{card:ScryfallCard}){const usd=card.prices.usd?parseFloat(card.prices.usd):null;const eur=card.prices.eur?parseFloat(card.prices.eur):null;return(<div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover}><div className="relative"><CardImg src={getScryfallImage(card)} alt={card.name}/><RarityBadge rarity={card.rarity}/></div><div className="p-3"><CardName name={card.name}/><CardSub text={card.set_name}/><PriceStack usd={usd} eur={eur}/></div></div>);}
+
+function CardMarketTile({card}:{card:CardMarketTCGCard}){const p=getCardMarketPriceSummary(card);return(<div className="rounded-[14px] cursor-pointer overflow-hidden" style={tileBase} {...hover}><div className="relative"><CardImg src={card.image} alt={card.name}/><RarityBadge rarity={card.rarity}/></div><div className="p-3"><CardName name={card.name}/><CardSub text={card.episode?.name??"CardMarket"}/><PriceStack usd={p.usd_market} eur={p.eur_avg} eur_es={p.eur_es} eur_de={p.eur_de} psa10={p.psa10}/></div></div>);}
+
+function StaticTile({card}:{card:{id:string;name:string;brand:string;price:string;emoji:string;bg:string}}){return(<div className="rounded-[14px] cursor-pointer" style={tileBase} {...hover}><div className="rounded-[10px] m-3 mb-0 flex items-center justify-center relative overflow-hidden" style={{height:80,fontSize:36}}><div className="absolute inset-0 opacity-[0.15]" style={{background:card.bg}}/><span className="relative z-10">{card.emoji}</span></div><div className="p-3"><CardName name={card.name}/><CardSub text={card.brand}/><div style={{fontFamily:"var(--font-display)",fontSize:17,color:"#fff"}}>{card.price}</div></div></div>);}
+
+function MLSection({query}:{query:string}){const{data,isLoading,isError}=useMercadoLivrePrice(query);return(<div className="mt-4"><div className="flex items-center gap-2 mb-3"><div className="flex items-center gap-[6px] rounded-[6px] px-3 py-[5px]" style={{background:"rgba(0,156,59,0.08)",border:"1px solid rgba(0,156,59,0.2)"}}><span style={{fontSize:12}}>🇧🇷</span><span style={{fontFamily:"var(--font-tech)",fontSize:9,color:"#00C853",letterSpacing:"0.1em"}}>MERCADO LIVRE · BRL</span>{isLoading&&<div style={{width:10,height:10,borderRadius:"50%",border:"1.5px solid rgba(0,200,83,0.3)",borderTopColor:"#00C853",animation:"spin 0.7s linear infinite",flexShrink:0}}/>}{!isLoading&&data?.stats&&<div style={{width:6,height:6,borderRadius:"50%",background:"#00C853",boxShadow:"0 0 5px #00C853"}}/>}</div><div className="flex-1 h-px" style={{background:"rgba(255,255,255,0.06)"}}/>{data?.stats&&<span style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.25)"}}>{data.stats.count} anúncios</span>}</div>{!isLoading&&data?.stats&&(<div className="rounded-[12px] p-3 mb-3 flex items-center justify-between" style={{background:"rgba(0,156,59,0.07)",border:"1px solid rgba(0,156,59,0.15)"}}><div><div style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.35)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>Preço médio</div><div style={{fontFamily:"var(--font-display)",fontSize:28,color:"#00C853",letterSpacing:"0.04em",lineHeight:1}}>{formatBRL(data.stats.avg)}</div></div><div className="text-right"><div style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.35)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>A partir de</div><div style={{fontFamily:"var(--font-display)",fontSize:20,color:"rgba(255,255,255,0.7)",letterSpacing:"0.04em"}}>{formatBRL(data.stats.low)}</div></div></div>)}<div className="rounded-[14px] overflow-hidden" style={{background:"#1C1C28",border:"1px solid rgba(255,255,255,0.07)"}}>{isLoading?(<div className="p-3">{Array.from({length:4},(_,i)=><div key={i} style={{height:48,borderRadius:8,marginBottom:6,background:"linear-gradient(90deg,#1C1C28 25%,#252535 50%,#1C1C28 75%)",backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite"}}/>)}</div>):isError?(<div className="text-center py-5" style={{fontFamily:"var(--font-tech)",fontSize:11,color:"rgba(255,255,255,0.3)"}}>⚠️ Erro ao buscar no Mercado Livre</div>):!data?.items.length?(<div className="text-center py-5" style={{fontFamily:"var(--font-tech)",fontSize:11,color:"rgba(255,255,255,0.3)"}}>Nenhum anúncio encontrado</div>):(data.items.slice(0,6).map((item:MercadoLivreItem,i:number)=>(<a key={item.id} href={item.permalink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 no-underline" style={{padding:"10px 14px",borderBottom:i<5?"1px solid rgba(255,255,255,0.06)":"none",display:"flex",transition:"background 0.15s"}} onMouseEnter={e=>((e.currentTarget as HTMLElement).style.background="rgba(255,255,255,0.03)")} onMouseLeave={e=>((e.currentTarget as HTMLElement).style.background="transparent")}><div className="flex-shrink-0 overflow-hidden rounded-[6px]" style={{width:36,height:36,background:"rgba(255,255,255,0.05)"}}>{item.thumbnail&&<img src={item.thumbnail.replace("I.jpg","O.jpg")} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} loading="lazy"/>}</div><div className="flex-1 min-w-0"><div style={{fontFamily:"var(--font-tech)",fontSize:10,color:"rgba(255,255,255,0.6)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</div><div style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.25)",marginTop:2}}>{item.condition==="new"?"✦ Novo":"◈ Usado"}</div></div><div style={{fontFamily:"var(--font-display)",fontSize:16,color:"#00C853",letterSpacing:"0.04em",flexShrink:0}}>{formatBRL(item.price)}</div></a>)))}</div></div>);}
+
+function CardMarketSection({query,game}:{query:string;game:"pokemon"|"magic"}){const{data,isLoading,isError}=useCardMarketSearch(query,game);if(!HAS_CM_KEY)return null;return(<div className="mt-4"><div className="flex items-center gap-2 mb-3"><div className="flex items-center gap-[6px] rounded-[6px] px-3 py-[5px]" style={{background:"rgba(89,68,160,0.1)",border:"1px solid rgba(89,68,160,0.3)"}}><span style={{fontSize:12}}>🇪🇺</span><span style={{fontFamily:"var(--font-tech)",fontSize:9,color:"#A084DC",letterSpacing:"0.1em"}}>CARDMARKET · EUR POR PAÍS</span>{isLoading&&<div style={{width:10,height:10,borderRadius:"50%",border:"1.5px solid rgba(160,132,220,0.3)",borderTopColor:"#A084DC",animation:"spin 0.7s linear infinite",flexShrink:0}}/>}{!isLoading&&data?.length&&<div style={{width:6,height:6,borderRadius:"50%",background:"#A084DC",boxShadow:"0 0 5px #A084DC"}}/>}</div><div className="flex-1 h-px" style={{background:"rgba(255,255,255,0.06)"}}/>{data?.length&&<span style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.25)"}}>{data.length} cartas</span>}</div>{isError&&<div className="text-center py-4 rounded-[12px]" style={{background:"#1C1C28",border:"1px solid rgba(255,255,255,0.07)",fontFamily:"var(--font-tech)",fontSize:11,color:"rgba(255,255,255,0.3)"}}>⚠️ Erro ao buscar no CardMarket</div>}{!isLoading&&!isError&&data&&data.length>0&&(<>{(()=>{const top=data[0];const p=getCardMarketPriceSummary(top);return(<div className="rounded-[14px] p-4 mb-3" style={{background:"#1C1C28",border:"1px solid rgba(89,68,160,0.2)"}}><div className="flex gap-3">{top.image&&<img src={top.image} alt={top.name} style={{width:52,height:72,objectFit:"contain",borderRadius:6,flexShrink:0}} loading="lazy"/>}<div className="flex-1 min-w-0"><div style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:700,color:"#fff",marginBottom:2}}>{top.name}</div><div style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.3)",letterSpacing:"0.05em",marginBottom:8}}>{top.episode?.name} · {top.rarity}</div><div className="grid grid-cols-2 gap-x-4 gap-y-1">{p.eur_es&&<Flag flag="🇪🇸" label="ES" value={formatEUR(p.eur_es)}/>}{p.eur_de&&<Flag flag="🇩🇪" label="DE" value={formatEUR(p.eur_de)}/>}{p.eur_fr&&<Flag flag="🇫🇷" label="FR" value={formatEUR(p.eur_fr)}/>}{p.eur_avg&&<Flag flag="🇪🇺" label="avg" value={formatEUR(p.eur_avg)}/>}{p.usd_market&&<Flag flag="🇺🇸" label="USD" value={formatUSD(p.usd_market)}/>}{p.psa10&&<Flag flag="🏆" label="PSA10" value={formatUSD(p.psa10)}/>}</div></div></div></div>);})()}<div className="rounded-[14px] overflow-hidden" style={{background:"#1C1C28",border:"1px solid rgba(255,255,255,0.07)"}}>{data.slice(1,7).map((card,i)=>{const p=getCardMarketPriceSummary(card);return(<div key={card.id} className="flex items-center gap-3" style={{padding:"9px 14px",borderBottom:i<5?"1px solid rgba(255,255,255,0.06)":"none"}}>{card.image&&<img src={card.image} alt={card.name} style={{width:28,height:38,objectFit:"contain",borderRadius:4,flexShrink:0}} loading="lazy"/>}<div className="flex-1 min-w-0"><div style={{fontFamily:"var(--font-mono)",fontSize:10,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.name}</div><div style={{fontFamily:"var(--font-tech)",fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.05em"}}>{card.rarity}</div></div><div className="flex flex-col items-end gap-[1px]">{p.eur_es&&<span style={{fontFamily:"var(--font-mono)",fontSize:10,fontWeight:700,color:"#A084DC"}}>{formatEUR(p.eur_es)} 🇪🇸</span>}{p.usd_market&&<span style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.4)"}}>{formatUSD(p.usd_market)} 🇺🇸</span>}</div></div>);})}</div></>)}</div>);}
+
+function ErrorState({msg}:{msg:string}){return<div className="col-span-2 text-center py-8"><div style={{fontSize:32,marginBottom:8}}>⚠️</div><div style={{fontFamily:"var(--font-tech)",fontSize:11,color:"rgba(255,255,255,0.3)"}}>{msg}</div></div>;}
+
+function EmptyState({query}:{query:string}){return<div className="col-span-2 text-center py-8"><div style={{fontSize:32,marginBottom:8}}>🔍</div><div style={{fontFamily:"var(--font-display)",fontSize:20,color:"rgba(255,255,255,0.4)",letterSpacing:"0.06em"}}>SEM RESULTADOS</div>{query&&<div style={{fontFamily:"var(--font-tech)",fontSize:10,color:"rgba(255,255,255,0.2)",marginTop:4}}>para "{query}"</div>}</div>;}
+
+const MarketPage=()=>{const[activeCat,setActiveCat]=useState<Category>("Pokémon");const[searchInput,setSearchInput]=useState("");const isPokemon=activeCat==="All"||activeCat==="Pokémon";const isMTG=activeCat==="MTG";const activeQ=searchInput.trim().length>=2?searchInput.trim():"";const defaultQ=activeQ||(isPokemon?"charizard":isMTG?"black lotus":"");const pokemonQ=usePokemonCards(isPokemon?defaultQ:"");const scryfallQ=useScryfallCards(isMTG?defaultQ:"");const isLoading=pokemonQ.isLoading||scryfallQ.isLoading;const mlQuery=activeQ?activeQ+(isPokemon?" pokemon":isMTG?" magic":" carta colecionável"):isPokemon?"charizard pokemon":isMTG?"magic the gathering":"";const cmGame:"pokemon"|"magic"=isMTG?"magic":"pokemon";const gridContent=useMemo(()=>{if(isPokemon){if(isLoading)return Array.from({length:6},(_,i)=><CardSkeleton key={i}/>);if(pokemonQ.isError)return[<ErrorState key="e" msg="Erro ao buscar cartas Pokémon."/>];if(!pokemonQ.data?.length)return[<EmptyState key="e" query={searchInput}/>];return pokemonQ.data.map(c=><PokemonTile key={c.id} card={c}/>);}if(isMTG){if(isLoading)return Array.from({length:6},(_,i)=><CardSkeleton key={i}/>);if(scryfallQ.isError)return[<ErrorState key="e" msg="Erro ao buscar cartas MTG."/>];if(!scryfallQ.data?.length)return[<EmptyState key="e" query={searchInput}/>];return scryfallQ.data.map(c=><ScryfallTile key={c.id} card={c}/>);}const statics=staticCards[activeCat as keyof typeof staticCards]??[];return statics.map(c=><StaticTile key={c.id} card={c}/>);},[activeCat,isLoading,pokemonQ,scryfallQ,searchInput,isPokemon,isMTG]);const resultCount=isPokemon?pokemonQ.data?.length:isMTG?scryfallQ.data?.length:undefined;return(<div><div style={{fontFamily:"var(--font-tech)",fontSize:10,letterSpacing:"0.2em",color:"#F56438",textTransform:"uppercase",marginBottom:6}}>Browse</div><h1 style={{fontFamily:"var(--font-display)",fontSize:42,letterSpacing:"0.02em",color:"#fff",lineHeight:0.95,marginBottom:14}}>MARKETPLACE</h1><div className="relative mb-[14px]"><svg className="absolute left-[13px] top-1/2 -translate-y-1/2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>{isLoading&&<div className="absolute right-[13px] top-1/2 -translate-y-1/2" style={{width:14,height:14,borderRadius:"50%",border:"2px solid rgba(252,171,32,0.3)",borderTopColor:"#FCAB20",animation:"spin 0.7s linear infinite"}}/>}<input type="text" value={searchInput} onChange={e=>setSearchInput(e.target.value)} placeholder={isPokemon?"Buscar carta Pokémon...":isMTG?"Buscar carta MTG...":"Buscar carta..."} className="w-full rounded-[10px] outline-none" style={{padding:"11px 14px 11px 40px",background:"#1C1C28",border:`1px solid ${isLoading?"rgba(252,171,32,0.3)":"rgba(255,255,255,0.07)"}`,fontFamily:"var(--font-tech)",fontSize:12,color:"#fff",letterSpacing:"0.05em",transition:"border-color 0.2s"}}/></div><div className="flex gap-[6px] overflow-x-auto mb-4 pb-[2px]" style={{scrollbarWidth:"none"}}>{categories.map(cat=>(<button key={cat} onClick={()=>{setActiveCat(cat);setSearchInput("");}} className="flex-shrink-0 cursor-pointer" style={{padding:"5px 14px",borderRadius:6,fontFamily:"var(--font-tech)",fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",background:activeCat===cat?"#FCAB20":"rgba(255,255,255,0.04)",color:activeCat===cat?"#000":"rgba(255,255,255,0.4)",border:`1px solid ${activeCat===cat?"#FCAB20":"rgba(255,255,255,0.07)"}`,transition:"all 0.15s"}}>{cat}</button>))}</div><div className="flex flex-wrap items-center gap-[6px] mb-3">{isPokemon&&<div className="flex items-center gap-[5px] rounded-[5px] px-2 py-[4px]" style={{background:"rgba(89,172,153,0.08)",border:"1px solid rgba(89,172,153,0.2)"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#59AC99",boxShadow:"0 0 4px #59AC99"}}/><span style={{fontFamily:"var(--font-tech)",fontSize:8,color:"#59AC99"}}>POKÉMON TCG 🇺🇸🇪🇺</span></div>}{isMTG&&<div className="flex items-center gap-[5px] rounded-[5px] px-2 py-[4px]" style={{background:"rgba(62,68,110,0.3)",border:"1px solid rgba(62,68,110,0.5)"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#8B96E0",boxShadow:"0 0 4px #8B96E0"}}/><span style={{fontFamily:"var(--font-tech)",fontSize:8,color:"#8B96E0"}}>SCRYFALL 🇺🇸🇪🇺</span></div>}{HAS_CM_KEY&&<div className="flex items-center gap-[5px] rounded-[5px] px-2 py-[4px]" style={{background:"rgba(89,68,160,0.1)",border:"1px solid rgba(89,68,160,0.3)"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#A084DC",boxShadow:"0 0 4px #A084DC"}}/><span style={{fontFamily:"var(--font-tech)",fontSize:8,color:"#A084DC"}}>CARDMARKET 🇪🇸🇩🇪🇫🇷🇮🇹</span></div>}<div className="flex items-center gap-[5px] rounded-[5px] px-2 py-[4px]" style={{background:"rgba(0,156,59,0.08)",border:"1px solid rgba(0,156,59,0.2)"}}><div style={{width:5,height:5,borderRadius:"50%",background:"#00C853",boxShadow:"0 0 4px #00C853"}}/><span style={{fontFamily:"var(--font-tech)",fontSize:8,color:"#00C853"}}>MERCADO LIVRE 🇧🇷</span></div></div><div className="grid grid-cols-2 gap-[10px] mb-1">{gridContent}</div>{!isLoading&&resultCount!=null&&(<div style={{fontFamily:"var(--font-tech)",fontSize:9,color:"rgba(255,255,255,0.2)",textAlign:"center",margin:"8px 0"}}>{resultCount} CARTAS ENCONTRADAS</div>)}{(isPokemon||isMTG)&&<CardMarketSection query={defaultQ} game={cmGame}/>}{mlQuery&&<MLSection query={mlQuery}/>}<style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>);};
 
 export default MarketPage;
