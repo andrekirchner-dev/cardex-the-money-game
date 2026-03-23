@@ -16,15 +16,20 @@ import {
   searchTCGDexCards,
   searchMercadoLivre,
   searchPokeTrace,
+  searchCardMarketCards,
+  getCardMarketEpisodeCards,
   calcMLStats,
   type PokemonCard,
   type ScryfallCard,
   type TCGDexCard,
+  type CardMarketTCGCard,
 } from "@/lib/api";
 import { useDebounce } from "./useDebounce";
 
-const STALE  = 5  * 60 * 1_000;
-const GC     = 30 * 60 * 1_000;
+const STALE = 5  * 60 * 1_000;
+const GC    = 30 * 60 * 1_000;
+
+const HAS_CM_KEY = !!import.meta.env.VITE_CARDMARKET_RAPIDAPI_KEY;
 
 // ──────────────────────────────────────────────────────────────
 // POKÉMON TCG
@@ -53,8 +58,7 @@ export function useFeaturedPokemonCards() {
 }
 
 // ──────────────────────────────────────────────────────────────
-// SCRYFALL (MTG) — substitui magicthegathering.io
-// Retorna USD + EUR nos próprios dados da carta
+// SCRYFALL (MTG) — preços USD + EUR nativos
 // ──────────────────────────────────────────────────────────────
 
 export function useScryfallCards(query: string) {
@@ -86,8 +90,7 @@ export function useTCGDexCards(query: string) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// MERCADO LIVRE 🇧🇷
-// Retorna estatísticas de preço em BRL para qualquer busca
+// MERCADO LIVRE 🇧🇷 — preços em BRL sem autenticação
 // ──────────────────────────────────────────────────────────────
 
 export function useMercadoLivrePrice(query: string) {
@@ -99,7 +102,7 @@ export function useMercadoLivrePrice(query: string) {
       return { items, stats: calcMLStats(items) };
     },
     enabled: q.length >= 3,
-    staleTime: 10 * 60 * 1_000, // preços ML mudam rápido, 10 min
+    staleTime: 10 * 60 * 1_000,
     gcTime: GC,
     retry: 1,
   });
@@ -122,10 +125,46 @@ export function usePokeTrace(query: string) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// HOOK PRINCIPAL DO MARKET — agrega todos os dados
+// CARDMARKET TCG (via RapidAPI) 🇪🇺
+// Preços EUR por país (ES, DE, FR, IT) + USD + PSA/CGC graded
+// Requer: VITE_CARDMARKET_RAPIDAPI_KEY
 // ──────────────────────────────────────────────────────────────
 
-export type MarketCategory = "All" | "Pokémon" | "Yu-Gi-Oh" | "MTG" | "Sports" | "One Piece";
+export function useCardMarketSearch(
+  query: string,
+  game: "pokemon" | "magic" | "lorcana" | "star-wars" = "pokemon"
+) {
+  const q = useDebounce(query.trim(), 400);
+  return useQuery<CardMarketTCGCard[]>({
+    queryKey: ["cardmarket", game, "search", q],
+    queryFn: () => searchCardMarketCards(q, game),
+    enabled: q.length >= 2 && HAS_CM_KEY,
+    staleTime: STALE,
+    gcTime: GC,
+    retry: 1,
+  });
+}
+
+export function useCardMarketEpisode(
+  episodeId: number | null,
+  game: "pokemon" | "magic" | "lorcana" | "star-wars" = "pokemon"
+) {
+  return useQuery<CardMarketTCGCard[]>({
+    queryKey: ["cardmarket", game, "episode", episodeId],
+    queryFn: () => getCardMarketEpisodeCards(episodeId!, game),
+    enabled: episodeId != null && HAS_CM_KEY,
+    staleTime: 15 * 60 * 1_000,
+    gcTime: GC,
+    retry: 1,
+  });
+}
+
+// ──────────────────────────────────────────────────────────────
+// HOOK PRINCIPAL DO MARKET — agrega todas as fontes
+// ──────────────────────────────────────────────────────────────
+
+export type MarketCategory =
+  | "All" | "Pokémon" | "Yu-Gi-Oh" | "MTG" | "Sports" | "One Piece";
 
 export function useMarketSearch(query: string, category: MarketCategory) {
   const q = query.trim();
@@ -134,12 +173,22 @@ export function useMarketSearch(query: string, category: MarketCategory) {
   const isPokemon = category === "All" || category === "Pokémon";
   const isMTG     = category === "MTG";
 
-  const pokemonResult = usePokemonCards(isPokemon ? (activeQ || "charizard") : "");
+  const pokemonResult  = usePokemonCards(isPokemon ? (activeQ || "charizard") : "");
   const scryfallResult = useScryfallCards(isMTG ? (activeQ || "black lotus") : "");
 
-  // Mercado Livre roda para todas as categorias que têm busca ativa
-  const mlQuery = activeQ || (isPokemon ? "charizard pokemon" : isMTG ? "magic the gathering" : "");
+  // CardMarket: pokémon ou magic dependendo da categoria
+  const cmGame = isMTG ? "magic" : "pokemon";
+  const cmResult = useCardMarketSearch(
+    activeQ || (isPokemon ? "charizard" : isMTG ? "black lotus" : ""),
+    cmGame
+  );
+
+  // Mercado Livre roda para todas as categorias com busca ativa
+  const mlQuery =
+    activeQ
+      ? activeQ + (isPokemon ? " pokemon" : isMTG ? " magic" : " carta")
+      : isPokemon ? "charizard pokemon" : isMTG ? "magic the gathering black lotus" : "";
   const mlResult = useMercadoLivrePrice(mlQuery);
 
-  return { pokemonResult, scryfallResult, mlResult };
+  return { pokemonResult, scryfallResult, cmResult, mlResult };
 }

@@ -244,3 +244,135 @@ export async function searchPokeTrace(query: string): Promise<PokeTraceCard[] | 
     { headers: { "X-API-Key": POKETRACE_KEY } }
   );
 }
+
+// ──────────────────────────────────────────────────────────────
+// CARDMARKET API TCG (via RapidAPI)
+// 🇪🇺  Preços reais do CardMarket em EUR por país (ES, DE, FR, IT)
+//      + TCGPlayer USD + PSA/CGC graded
+// Docs: https://rapidapi.com/tcggopro/api/cardmarket-api-tcg
+// Key:  VITE_CARDMARKET_RAPIDAPI_KEY
+// Free: 100 req/dia · 30 req/min
+// ──────────────────────────────────────────────────────────────
+
+const CM_BASE = "https://cardmarket-api-tcg.p.rapidapi.com";
+const CM_KEY  = import.meta.env.VITE_CARDMARKET_RAPIDAPI_KEY ?? "";
+
+const CM_HEADERS = {
+  "x-rapidapi-host": "cardmarket-api-tcg.p.rapidapi.com",
+  "x-rapidapi-key": CM_KEY,
+  "Content-Type": "application/json",
+};
+
+// Tipo completo de uma carta retornada pelo CardMarket API TCG
+export interface CardMarketTCGCard {
+  id: string | number;
+  name: string;
+  name_numbered?: string;
+  card_number?: string;
+  rarity?: string;
+  image?: string;
+  episode?: { id: number; name: string; code?: string };
+  artist?: { id: number; name: string };
+  prices?: {
+    cardmarket?: {
+      currency: "EUR";
+      avg?: number;
+      low?: number;
+      trend?: number;
+      /** Preços por país europeu */
+      de?: number;
+      fr?: number;
+      es?: number;    // 🇪🇸 Espanha
+      it?: number;
+      /** Foil / reverse */
+      avg_foil?: number;
+      low_foil?: number;
+    };
+    tcgplayer?: {
+      currency: "USD";
+      market?: number;
+      low?: number;
+      avg?: number;
+      high?: number;
+      market_foil?: number;
+    };
+    graded?: {
+      psa_10?: number;
+      psa_9?: number;
+      psa_8?: number;
+      cgc_10?: number;
+      cgc_9?: number;
+    };
+  };
+}
+
+interface CMResponse {
+  data: CardMarketTCGCard[];
+  meta?: { total: number; page: number };
+}
+
+/**
+ * Busca cartas Pokémon com preços do CardMarket (EUR) + TCGPlayer (USD).
+ * game: "pokemon" | "magic" | "lorcana" | "star-wars"
+ */
+export async function searchCardMarketCards(
+  query: string,
+  game: "pokemon" | "magic" | "lorcana" | "star-wars" = "pokemon",
+  limit = 20
+): Promise<CardMarketTCGCard[]> {
+  if (!CM_KEY) {
+    console.warn("[CardMarket] API key não configurada → VITE_CARDMARKET_RAPIDAPI_KEY");
+    return [];
+  }
+  const data = await safeFetch<CMResponse>(
+    `${CM_BASE}/${game}/cards/search?name=${encodeURIComponent(query)}&limit=${limit}&sort=price_highest`,
+    "CardMarket",
+    { headers: CM_HEADERS }
+  );
+  return data.data ?? [];
+}
+
+/**
+ * Busca cartas de um set/episódio específico no CardMarket.
+ * Útil para mostrar todo o conjunto de um set ordenado por preço.
+ */
+export async function getCardMarketEpisodeCards(
+  episodeId: number,
+  game: "pokemon" | "magic" | "lorcana" | "star-wars" = "pokemon",
+  sort: "price_highest" | "price_lowest" | "name" = "price_highest"
+): Promise<CardMarketTCGCard[]> {
+  if (!CM_KEY) return [];
+  const data = await safeFetch<CMResponse>(
+    `${CM_BASE}/${game}/episodes/${episodeId}/cards?sort=${sort}`,
+    "CardMarket",
+    { headers: CM_HEADERS }
+  );
+  return data.data ?? [];
+}
+
+/**
+ * Extrai o melhor resumo de preços de uma carta do CardMarket.
+ * Retorna valores formatados prontos para exibição.
+ */
+export function getCardMarketPriceSummary(card: CardMarketTCGCard) {
+  const cm = card.prices?.cardmarket;
+  const tcp = card.prices?.tcgplayer;
+  const g = card.prices?.graded;
+  return {
+    // CardMarket EUR
+    eur_avg:   cm?.avg    ?? cm?.trend ?? null,
+    eur_low:   cm?.low    ?? null,
+    eur_es:    cm?.es     ?? null,   // Espanha 🇪🇸
+    eur_de:    cm?.de     ?? null,   // Alemanha 🇩🇪
+    eur_fr:    cm?.fr     ?? null,   // França 🇫🇷
+    eur_foil:  cm?.avg_foil ?? null,
+    // TCGPlayer USD
+    usd_market: tcp?.market ?? tcp?.avg ?? null,
+    usd_low:    tcp?.low    ?? null,
+    usd_foil:   tcp?.market_foil ?? null,
+    // Graded
+    psa10: g?.psa_10 ?? null,
+    psa9:  g?.psa_9  ?? null,
+    cgc10: g?.cgc_10 ?? null,
+  };
+}
