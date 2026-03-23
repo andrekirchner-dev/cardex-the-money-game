@@ -12,7 +12,7 @@ function CardRowSkeleton() {
   return (
     <div className="flex items-center justify-between" style={{ padding: "11px 0" }}>
       <div className="flex items-center gap-3">
-        <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.05)", animation: "shimmer 1.5s infinite" }} />
+        <div style={{ width: 45, height: 63, borderRadius: 6, background: "rgba(255,255,255,0.05)", animation: "shimmer 1.5s infinite" }} />
         <div><div style={{ width: 120, height: 10, borderRadius: 4, background: "rgba(255,255,255,0.07)", marginBottom: 6 }} /><div style={{ width: 80, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.04)" }} /></div>
       </div>
       <div><div style={{ width: 50, height: 14, borderRadius: 4, background: "rgba(255,255,255,0.07)", marginBottom: 6 }} /><div style={{ width: 45, height: 16, borderRadius: 4, background: "rgba(255,255,255,0.05)" }} /></div>
@@ -32,8 +32,8 @@ function PokemonCardRow({ card, isLast }: { card: PokemonCard; isLast: boolean }
       onMouseEnter={e => ((e.currentTarget as HTMLElement).style.opacity = "0.7")}
       onMouseLeave={e => ((e.currentTarget as HTMLElement).style.opacity = "1")}>
       <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}>
-          {card.images?.small ? <img src={card.images.small} alt={card.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 20 }}>🃏</span>}
+        <div className="flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ width: 45, height: 63, borderRadius: 6, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}>
+          {card.images?.small ? <img src={card.images.small} alt={card.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 20 }}>🃏</span>}
         </div>
         <div>
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 2, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.name}</div>
