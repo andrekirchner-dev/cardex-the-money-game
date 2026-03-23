@@ -10,7 +10,7 @@ export interface MercadoLivreResponse { results:MercadoLivreItem[]; paging:{tota
 
 export interface PokeTraceCard { id:string; name:string; set:string; number:string; image?:string; tcgplayer?:{market?:number;low?:number}; ebay?:{sold?:number;recent?:number}; cardmarket?:{trend?:number;low?:number} }
 
-export interface CardMarketTCGCard { id:string|number; name:string; name_numbered?:string; card_number?:string; rarity?:string; image?:string; episode?:{id:number;name:string;code?:string}; artist?:{id:number;name:string}; prices?:{cardmarket?:{currency:"EUR";avg?:number;low?:number;trend?:number;de?:number;fr?:number;es?:number;it?:number;avg_foil?:number;low_foil?:number};tcgplayer?:{currency:"USD";market?:number;low?:number;avg?:number;high?:number;market_foil?:number};graded?:{psa_10?:number;psa_9?:number;psa_8?:number;cgc_10?:number;cgc_9?:number}} }
+export interface CardMarketTCGCard { id:string|number; name:string; name_numbered?:string; card_number?:string; rarity?:string; image?:string; episode?:{id:number;name:string;code?:string}; artist?:{id:number;name:string}; prices?:{cardmarket?:{currency:"EUR";avg?:number;low?:number;trend?:number;de?:number;fr?:number;es?:number;it?:number;avg_foil?:number;low_foil?:number;lowest_near_mint?:number;lowest_near_mint_DE?:number;lowest_near_mint_FR?:number;lowest_near_mint_ES?:number;lowest_near_mint_IT?:number;"30d_average"?:number;graded?:{psa?:{psa10?:number;psa9?:number};cgc?:{cgc10?:number;cgc9?:number}}};tcgplayer?:{currency:"USD";market?:number;low?:number;avg?:number;high?:number;market_foil?:number};tcg_player?:{currency:"USD";market_price?:number;low?:number;avg?:number;high?:number;market_foil?:number};graded?:{psa_10?:number;psa_9?:number;psa_8?:number;cgc_10?:number;cgc_9?:number}} }
 
 async function safeFetch<T>(url:string, label:string, options?:RequestInit):Promise<T> { const res=await fetch(url,options); if(!res.ok) throw new Error(`[${label}] HTTP ${res.status}`); return res.json() as Promise<T>; }
 
@@ -46,14 +46,14 @@ const POKETRACE_KEY=import.meta.env.VITE_POKETRACE_API_KEY??""; const POKETRACE_
 
 export async function searchPokeTrace(query:string):Promise<PokeTraceCard[]|null> { if(!POKETRACE_KEY) return null; return safeFetch<PokeTraceCard[]>(`${POKETRACE_BASE}/cards?name=${encodeURIComponent(query)}&limit=20`,"PokeTrace",{headers:{"X-API-Key":POKETRACE_KEY}}); }
 
-const CM_BASE="https://cardmarket-api-tcg.p.rapidapi.com"; const CM_KEY=import.meta.env.VITE_CARDMARKET_RAPIDAPI_KEY??"";
+const CM_BASE="https://cardmarket-api-tcg.p.rapidapi.com"; const CM_KEY=import.meta.env.VITE_CARDMARKET_RAPIDAPI_KEY||"0d993e5135msh71c856c06b335aep1360a2jsnddde102c316c";
 
 const CM_HEADERS={"x-rapidapi-host":"cardmarket-api-tcg.p.rapidapi.com","x-rapidapi-key":CM_KEY,"Content-Type":"application/json"};
 
 interface CMResponse{data:CardMarketTCGCard[];meta?:{total:number;page:number}}
 
-export async function searchCardMarketCards(query:string,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon",limit=20):Promise<CardMarketTCGCard[]> { if(!CM_KEY){console.warn("[CardMarket] API key não configurada");return [];} const data=await safeFetch<CMResponse>(`${CM_BASE}/${game}/cards/search?name=${encodeURIComponent(query)}&limit=${limit}&sort=price_highest`,"CardMarket",{headers:CM_HEADERS}); return data.data??[]; }
+export async function searchCardMarketCards(query:string,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon",limit=20):Promise<CardMarketTCGCard[]> { if(!CM_KEY){console.warn("[CardMarket] API key não configurada");return [];} const data=await safeFetch<CMResponse>(`${CM_BASE}/${game}/cards?search=${encodeURIComponent(query)}&limit=${limit}&sort=price_highest`,"CardMarket",{headers:CM_HEADERS}); return data.data??[]; }
 
 export async function getCardMarketEpisodeCards(episodeId:number,game:"pokemon"|"magic"|"lorcana"|"star-wars"="pokemon",sort:"price_highest"|"price_lowest"|"name"="price_highest"):Promise<CardMarketTCGCard[]> { if(!CM_KEY) return []; const data=await safeFetch<CMResponse>(`${CM_BASE}/${game}/episodes/${episodeId}/cards?sort=${sort}`,"CardMarket",{headers:CM_HEADERS}); return data.data??[]; }
 
-export function getCardMarketPriceSummary(card:CardMarketTCGCard){const cm=card.prices?.cardmarket;const tcp=card.prices?.tcgplayer;const g=card.prices?.graded;return{eur_avg:cm?.avg??cm?.trend??null,eur_low:cm?.low??null,eur_es:cm?.es??null,eur_de:cm?.de??null,eur_fr:cm?.fr??null,eur_foil:cm?.avg_foil??null,usd_market:tcp?.market??tcp?.avg??null,usd_low:tcp?.low??null,usd_foil:tcp?.market_foil??null,psa10:g?.psa_10??null,psa9:g?.psa_9??null,cgc10:g?.cgc_10??null};}
+export function getCardMarketPriceSummary(card:CardMarketTCGCard){const cm=card.prices?.cardmarket as any;const tcp=card.prices?.tcgplayer as any;const tcp2=card.prices?.tcg_player as any;const g=card.prices?.graded;return{eur_avg:cm?.lowest_near_mint??cm?.["30d_average"]??cm?.avg??cm?.trend??null,eur_low:cm?.low??null,eur_es:cm?.lowest_near_mint_ES??cm?.es??null,eur_de:cm?.lowest_near_mint_DE??cm?.de??null,eur_fr:cm?.lowest_near_mint_FR??cm?.fr??null,eur_foil:cm?.avg_foil??null,usd_market:tcp2?.market_price??tcp?.market??tcp?.avg??null,usd_low:tcp2?.low??tcp?.low??null,usd_foil:tcp?.market_foil??null,psa10:cm?.graded?.psa?.psa10??g?.psa_10??null,psa9:cm?.graded?.psa?.psa9??g?.psa_9??null,cgc10:cm?.graded?.cgc?.cgc10??g?.cgc_10??null};}
