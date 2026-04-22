@@ -1,7 +1,8 @@
 import { useState, useCallback, lazy, Suspense, useEffect } from "react";
-import PhoneShell from "@/components/cardex/PhoneShell";
 import SplashScreen from "@/components/cardex/SplashScreen";
 import BottomNav from "@/components/cardex/BottomNav";
+import LoginPage from "@/components/cardex/LoginPage";
+import { useAuth } from "@/hooks/useAuth";
 
 const HomePage = lazy(() => import("@/components/cardex/pages/HomePage"));
 const IndexPage = lazy(() => import("@/components/cardex/pages/IndexPage"));
@@ -14,9 +15,8 @@ const GradedLibraryPage = lazy(() => import("@/components/cardex/pages/GradedLib
 const TradesHistoryPage = lazy(() => import("@/components/cardex/pages/TradesHistoryPage"));
 const WishlistPage = lazy(() => import("@/components/cardex/pages/WishlistPage"));
 
-const pages = ["home", "index", "scanner", "trade", "profile", "settings", "card-library", "graded-library", "trades-history", "wishlist"] as const;
+const pages = ["home","index","scanner","trade","profile","settings","card-library","graded-library","trades-history","wishlist"] as const;
 type Page = (typeof pages)[number];
-
 const SPLASH_DURATION_MS = 3200;
 
 function PageSkeleton() {
@@ -32,24 +32,18 @@ function PageSkeleton() {
   );
 }
 
-// Map sub-pages to their parent tab for bottom nav highlighting
 function getNavTab(page: Page): "home" | "index" | "scanner" | "trade" | "profile" {
   switch (page) {
-    case "settings":
-    case "card-library":
-    case "graded-library":
-    case "trades-history":
-      return "profile";
-    case "wishlist":
-      return "home";
-    default:
-      return page as "home" | "index" | "scanner" | "trade" | "profile";
+    case "settings": case "card-library": case "graded-library": case "trades-history": return "profile";
+    case "wishlist": return "home";
+    default: return page as "home" | "index" | "scanner" | "trade" | "profile";
   }
 }
 
 const Index = () => {
   const [activePage, setActivePage] = useState<Page>("home");
   const [splashVisible, setSplashVisible] = useState(true);
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     const t = setTimeout(() => setSplashVisible(false), SPLASH_DURATION_MS);
@@ -59,6 +53,18 @@ const Index = () => {
   const handleNavigate = useCallback((page: string) => {
     setActivePage(page as Page);
   }, []);
+
+  // Auth loading — show blank screen (splash still handles visual)
+  if (loading) {
+    return (
+      <div style={{ background: "radial-gradient(ellipse at 30% 0%, #1a1025 0%, #0A0A0F 60%)", minHeight: "100vh" }}>
+        {splashVisible && <SplashScreen />}
+      </div>
+    );
+  }
+
+  // Not logged in — show login page
+  if (!user) return <LoginPage />;
 
   const renderPage = () => {
     switch (activePage) {
@@ -76,22 +82,12 @@ const Index = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ background: "radial-gradient(ellipse at 30% 0%, #1a1025 0%, #0A0A0F 60%)" }}>
-      <PhoneShell>
-        {splashVisible && <SplashScreen />}
-        <div className="h-[44px] flex-shrink-0 flex items-center justify-between px-7 relative z-10">
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: "#fff", letterSpacing: "0.05em" }}>9:41</span>
-          <div className="absolute top-[10px] left-1/2 -translate-x-1/2 w-[120px] h-[34px] bg-black rounded-[24px]" />
-          <div className="flex items-center gap-[5px]">
-            <svg width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.24 4.24 0 00-6 0zm-4-4l2 2a7.07 7.07 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z" /></svg>
-            <svg width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.34C7 21.4 7.6 22 8.33 22h7.34c.73 0 1.33-.6 1.33-1.33V5.33C17 4.6 16.4 4 15.67 4z" /></svg>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 pb-[90px]" style={{ scrollBehavior: "smooth", scrollbarWidth: "none" }}>
-          <Suspense fallback={<PageSkeleton />}>{renderPage()}</Suspense>
-        </div>
-        <BottomNav active={getNavTab(activePage)} onNavigate={handleNavigate} />
-      </PhoneShell>
+    <div className="relative flex flex-col min-h-screen w-full" style={{ background: "radial-gradient(ellipse at 30% 0%, #1a1025 0%, #0A0A0F 60%)" }}>
+      {splashVisible && <SplashScreen />}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-6 pb-[90px]" style={{ scrollBehavior: "smooth", scrollbarWidth: "none" }}>
+        <Suspense fallback={<PageSkeleton />}>{renderPage()}</Suspense>
+      </div>
+      <BottomNav active={getNavTab(activePage)} onNavigate={handleNavigate} />
     </div>
   );
 };

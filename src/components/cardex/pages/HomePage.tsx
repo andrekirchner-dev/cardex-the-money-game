@@ -1,7 +1,7 @@
 import { useFeaturedPokemonCards } from "@/hooks/useCardSearch";
 import { getPokemonPrice, formatUSD, type PokemonCard } from "@/lib/api";
-
-const portfolioStats = [{ val: "127", key: "Cards" }, { val: "14", key: "Sets" }, { val: "23", key: "Graded" }, { val: "89%", key: "Value" }];
+import { useAuth } from "@/hooks/useAuth";
+import { useCollection } from "@/hooks/useFirestore";
 const badgeColors = {
   green: { bg: "rgba(89,172,153,0.15)", color: "#59AC99", border: "rgba(89,172,153,0.25)" },
   red: { bg: "rgba(231,54,60,0.15)", color: "#E7363C", border: "rgba(231,54,60,0.25)" },
@@ -49,8 +49,19 @@ function PokemonCardRow({ card, isLast }: { card: PokemonCard; isLast: boolean }
 }
 
 const HomePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+  const { user } = useAuth();
+  const { cards: myCards, stats } = useCollection(user?.uid ?? null);
   const { data: featuredCards, isLoading, isError } = useFeaturedPokemonCards();
   const displayCards = featuredCards?.slice(0, 4) ?? [];
+
+  const totalValueUSD = stats.totalValue;
+  const totalValueBRL = totalValueUSD * 5;
+  const portfolioStats = [
+    { val: String(stats.total), key: "Cards" },
+    { val: String(stats.sets), key: "Sets" },
+    { val: String(stats.graded), key: "Graded" },
+    { val: stats.total > 0 ? `${Math.round((stats.graded / stats.total) * 100)}%` : "0%", key: "Graded%" },
+  ];
 
   return (
     <div>
@@ -64,8 +75,12 @@ const HomePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         onClick={() => onNavigate("card-library")}
       >
         <div style={{ fontFamily: "var(--font-tech)", fontSize: 10, letterSpacing: "0.15em", color: "rgba(0,0,0,0.5)", textTransform: "uppercase", marginBottom: 6, position: "relative" }}>Total Value</div>
-        <div style={{ fontFamily: "var(--font-display)", fontSize: 48, color: "#000", letterSpacing: "0.02em", lineHeight: 1, position: "relative" }}>$11,405</div>
-        <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: "rgba(0,0,0,0.45)", marginTop: 2, position: "relative" }}>R$ 57,025.00</div>
+        <div style={{ fontFamily: "var(--font-display)", fontSize: 48, color: "#000", letterSpacing: "0.02em", lineHeight: 1, position: "relative" }}>
+          {totalValueUSD > 0 ? formatUSD(totalValueUSD) : "$0.00"}
+        </div>
+        <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: "rgba(0,0,0,0.45)", marginTop: 2, position: "relative" }}>
+          {totalValueBRL > 0 ? `R$ ${totalValueBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "R$ 0,00"}
+        </div>
         <div className="grid grid-cols-4 gap-2 mt-4 relative">
           {portfolioStats.map(s => (
             <div key={s.key} className="rounded-[10px] p-2 text-center" style={{ background: "rgba(0,0,0,0.15)" }}>
