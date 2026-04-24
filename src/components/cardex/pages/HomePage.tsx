@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useFeaturedPokemonCards } from "@/hooks/useCardSearch";
 import { getPokemonPrice, formatUSD, type PokemonCard } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollection } from "@/hooks/useFirestore";
+import AddCardModal from "@/components/cardex/AddCardModal";
 const badgeColors = {
   green: { bg: "rgba(89,172,153,0.15)", color: "#59AC99", border: "rgba(89,172,153,0.25)" },
   red: { bg: "rgba(231,54,60,0.15)", color: "#E7363C", border: "rgba(231,54,60,0.25)" },
@@ -50,7 +52,8 @@ function PokemonCardRow({ card, isLast }: { card: PokemonCard; isLast: boolean }
 
 const HomePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const { user } = useAuth();
-  const { cards: myCards, stats } = useCollection(user?.uid ?? null);
+  const { cards: myCards, stats, refresh } = useCollection(user?.uid ?? null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const { data: featuredCards, isLoading, isError } = useFeaturedPokemonCards();
   const displayCards = featuredCards?.slice(0, 4) ?? [];
 
@@ -169,7 +172,7 @@ const HomePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
       )}
 
       <div className="flex gap-2 mt-[14px]">
-        <button className="flex-1 inline-flex items-center justify-center gap-[7px] rounded-[10px] border-none cursor-pointer" style={{
+        <button onClick={() => setShowAddModal(true)} className="flex-1 inline-flex items-center justify-center gap-[7px] rounded-[10px] border-none cursor-pointer" style={{
           fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 12, letterSpacing: "0.04em", textTransform: "uppercase",
           background: "linear-gradient(135deg, #E7363C, #F56438)", color: "#fff", padding: "12px 20px", boxShadow: "0 4px 20px rgba(231,54,60,0.35)",
         }}>+ Add Card</button>
@@ -179,6 +182,10 @@ const HomePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         }}>Wishlist</button>
       </div>
       <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+
+      {showAddModal && (
+        <AddCardModal onClose={() => { setShowAddModal(false); refresh(); }} />
+      )}
     </div>
   );
 };
