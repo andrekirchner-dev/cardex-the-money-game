@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useCollection, useWishlist, useTrades } from "@/hooks/useFirestore";
+import { isAdminEmail } from "@/hooks/useAdmin";
 
 const ProfilePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   const { user, profile, logout } = useAuth();
@@ -8,6 +9,7 @@ const ProfilePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => 
   const { trades } = useTrades(user?.uid ?? null);
 
   const gradedCount = cards.filter(c => c.isGraded).length;
+  const isAdmin = isAdminEmail(user?.email);
   const displayName = profile?.displayName ?? user?.displayName ?? "Collector";
   const memberSince = profile?.memberSince ?? new Date().getFullYear().toString();
   const plan = profile?.plan ?? "free";
@@ -110,11 +112,26 @@ const ProfilePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => 
         ))}
       </div>
 
+      {/* Admin Panel button — only for admin */}
+      {isAdmin && (
+        <button onClick={() => onNavigate("admin")}
+          className="w-full mt-[14px] inline-flex items-center justify-center gap-2 rounded-[10px] cursor-pointer"
+          style={{
+            fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 12, letterSpacing: "0.05em", textTransform: "uppercase",
+            background: "linear-gradient(135deg, #1a0a0a, #2a0a0a)",
+            color: "#E7363C", padding: "11px 16px",
+            border: "1px solid rgba(231,54,60,0.3)",
+            boxShadow: "0 0 20px rgba(231,54,60,0.1)",
+          }}>
+          <span style={{ fontSize: 14 }}>⚙</span> Admin Panel
+        </button>
+      )}
+
       <button onClick={logout}
-        className="w-full mt-[14px] inline-flex items-center justify-center gap-[7px] rounded-[10px] cursor-pointer"
+        className="w-full mt-3 inline-flex items-center justify-center gap-[7px] rounded-[10px] cursor-pointer"
         style={{
           fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 12, letterSpacing: "0.04em", textTransform: "uppercase",
-          background: "rgba(231,54,60,0.08)", color: "#E7363C", padding: "11px 16px", border: "1px solid rgba(231,54,60,0.15)",
+          background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.35)", padding: "11px 16px", border: "1px solid rgba(255,255,255,0.07)",
         }}>
         Sign Out
       </button>

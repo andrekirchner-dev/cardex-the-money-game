@@ -91,23 +91,82 @@ const HomePage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
         </div>
       </div>
 
-      {/* Recent Collection */}
-      <div className="flex items-center gap-2 mb-[10px]" style={{ fontFamily: "var(--font-tech)", fontSize: 9, letterSpacing: "0.2em", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" }}>
-        {isLoading ? "Carregando..." : "Recent Collection"}
-        <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
-        {!isLoading && !isError && (
-          <div className="flex items-center gap-1">
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#59AC99", boxShadow: "0 0 5px #59AC99" }} />
-            <span style={{ fontSize: 8, color: "#59AC99" }}>LIVE</span>
+      {/* My Collection OR Empty State */}
+      {stats.total > 0 ? (
+        <>
+          <div className="flex items-center gap-2 mb-[10px]" style={{ fontFamily: "var(--font-tech)", fontSize: 9, letterSpacing: "0.2em", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" }}>
+            Minha Coleção
+            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
+            <div className="flex items-center gap-1">
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#59AC99", boxShadow: "0 0 5px #59AC99" }} />
+              <span style={{ fontSize: 8, color: "#59AC99" }}>LIVE</span>
+            </div>
           </div>
-        )}
-      </div>
+          <div className="rounded-[16px] p-[14px]" style={{ background: "#1C1C28", border: "1px solid rgba(255,255,255,0.07)" }}>
+            {myCards.slice(0, 4).map((card, i) => (
+              <div key={card.id ?? i} className="flex items-center justify-between" style={{ padding: "11px 0", borderBottom: i < Math.min(myCards.length, 4) - 1 ? "1px solid rgba(255,255,255,0.07)" : "none" }}>
+                <div className="flex items-center gap-3">
+                  <div style={{ width: 45, height: 63, borderRadius: 6, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+                    {card.imageUrl ? <img src={card.imageUrl} alt={card.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 20 }}>🃏</span>}
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 2 }}>{card.name}</div>
+                    <div style={{ fontFamily: "var(--font-tech)", fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em" }}>{card.game} · {card.setName}</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  {card.currentPrice != null && (
+                    <div style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff" }}>${card.currentPrice.toFixed(2)}</div>
+                  )}
+                  {card.isGraded && (
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, color: "#FCAB20", background: "rgba(252,171,32,0.1)", border: "1px solid rgba(252,171,32,0.2)", borderRadius: 4, padding: "1px 6px" }}>
+                      {card.gradeCompany ?? "PSA"} {card.gradeScore}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 mb-[10px]" style={{ fontFamily: "var(--font-tech)", fontSize: 9, letterSpacing: "0.2em", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" }}>
+            Minha Coleção
+            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
+          </div>
+          <div className="rounded-[16px] p-6 text-center" style={{ background: "#1C1C28", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>🃏</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 6 }}>Coleção vazia</div>
+            <div style={{ fontFamily: "var(--font-tech)", fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: "0.06em", marginBottom: 16 }}>
+              Adicione suas primeiras cartas para começar a rastrear sua coleção
+            </div>
+            <button onClick={() => onNavigate("scanner")}
+              style={{ background: "linear-gradient(135deg,#E7363C,#F56438)", border: "none", borderRadius: 10, padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "#fff", cursor: "pointer", letterSpacing: "0.04em" }}>
+              📷 Escanear primeira carta
+            </button>
+          </div>
 
-      <div className="rounded-[16px] p-[14px]" style={{ background: "#1C1C28", border: "1px solid rgba(255,255,255,0.07)" }}>
-        {isLoading ? Array.from({ length: 4 }, (_, i) => <div key={i} style={{ borderBottom: i < 3 ? "1px solid rgba(255,255,255,0.07)" : "none" }}><CardRowSkeleton /></div>)
-          : isError ? <div className="text-center py-6"><div style={{ fontFamily: "var(--font-tech)", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>⚠️ Não foi possível carregar as cartas.</div></div>
-          : displayCards.map((card, i) => <PokemonCardRow key={card.id} card={card} isLast={i === displayCards.length - 1} />)}
-      </div>
+          {/* Market Spotlight — clearly labeled as market data */}
+          <div className="flex items-center gap-2 mt-4 mb-[10px]" style={{ fontFamily: "var(--font-tech)", fontSize: 9, letterSpacing: "0.2em", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" }}>
+            Market Spotlight
+            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
+            {!isLoading && !isError && (
+              <div className="flex items-center gap-1">
+                <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#59AC99", boxShadow: "0 0 5px #59AC99" }} />
+                <span style={{ fontSize: 8, color: "#59AC99" }}>API LIVE</span>
+              </div>
+            )}
+          </div>
+          <div style={{ fontFamily: "var(--font-tech)", fontSize: 9, color: "rgba(255,255,255,0.2)", letterSpacing: "0.04em", marginBottom: 8 }}>
+            Preços de mercado em tempo real — não são suas cartas
+          </div>
+          <div className="rounded-[16px] p-[14px]" style={{ background: "#1C1C28", border: "1px solid rgba(255,255,255,0.07)" }}>
+            {isLoading ? Array.from({ length: 4 }, (_, i) => <div key={i} style={{ borderBottom: i < 3 ? "1px solid rgba(255,255,255,0.07)" : "none" }}><CardRowSkeleton /></div>)
+              : isError ? <div className="text-center py-6"><div style={{ fontFamily: "var(--font-tech)", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>⚠️ Mercado indisponível.</div></div>
+              : displayCards.map((card, i) => <PokemonCardRow key={card.id} card={card} isLast={i === displayCards.length - 1} />)}
+          </div>
+        </>
+      )}
 
       <div className="flex gap-2 mt-[14px]">
         <button className="flex-1 inline-flex items-center justify-center gap-[7px] rounded-[10px] border-none cursor-pointer" style={{
